@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureGuard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="w-80 bg-gray-50">
+  <div class="p-4">
+    <div class="flex items-center space-x-2 mb-4">
+      <img src="icons/icon48.png" alt="SecureGuard Logo" class="w-8 h-8">
+      <h1 class="text-xl font-bold text-gray-900">SecureGuard</h1>
+    </div>
+
+    <div id="emailAnalysis" class="hidden">
+      <h2 class="text-lg font-semibold mb-2">Email Analysis</h2>
+      <div id="emailResult" class="p-3 rounded-lg mb-4"></div>
+    </div>
+
+    <div id="codeAnalysis" class="hidden">
+      <h2 class="text-lg font-semibold mb-2">Code Analysis</h2>
+      <select id="language" class="w-full p-2 border rounded mb-2">
+        <option value="javascript">JavaScript</option>
+        <option value="python">Python</option>
+      </select>
+      <textarea id="codeInput" class="w-full h-32 p-2 border rounded mb-2" placeholder="Paste your code here..."></textarea>
+      <button id="analyzeCode" class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+        Analyze Code
+      </button>
+      <div id="codeResult" class="mt-4"></div>
+    </div>
+
+    <div class="mt-4 text-center">
+      <a href="http://localhost:5173" target="_blank" class="text-blue-600 hover:underline text-sm">
+        Open Web Dashboard
+      </a>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
