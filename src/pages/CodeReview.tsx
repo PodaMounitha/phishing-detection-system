@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Upload } from 'lucide-react';
 import { analyzeCode } from '../lib/api';
 
 export function CodeReview() {
@@ -21,9 +21,9 @@ export function CodeReview() {
     try {
       const response = await analyzeCode(code, language);
       setResult(response);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Code analysis failed:', err);
-      setError('Failed to connect to the analysis server. Please ensure the backend is running.');
+      setError(err.message || 'Failed to connect to the analysis server. Please ensure the backend is running.');
       setResult(null);
     } finally {
       setIsLoading(false);
@@ -118,41 +118,52 @@ export function CodeReview() {
               Analysis Results
             </h2>
             <div className="space-y-4">
-              {result.issues.map((issue, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`p-4 rounded-lg ${
-                    issue.severity === 'high'
-                      ? 'bg-red-50 dark:bg-red-900/20'
-                      : issue.severity === 'medium'
-                      ? 'bg-yellow-50 dark:bg-yellow-900/20'
-                      : 'bg-blue-50 dark:bg-blue-900/20'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <AlertTriangle
-                      className={`w-5 h-5 ${
-                        issue.severity === 'high'
-                          ? 'text-red-600 dark:text-red-400'
-                          : issue.severity === 'medium'
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-blue-600 dark:text-blue-400'
-                      }`}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        Line {issue.line}: {issue.message}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                        Severity: {issue.severity}
-                      </p>
+              {result.issues.length > 0 ? (
+                result.issues.map((issue, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`p-4 rounded-lg ${
+                      issue.severity === 'high'
+                        ? 'bg-red-50 dark:bg-red-900/20'
+                        : issue.severity === 'medium'
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20'
+                        : 'bg-blue-50 dark:bg-blue-900/20'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <AlertTriangle
+                        className={`w-5 h-5 ${
+                          issue.severity === 'high'
+                            ? 'text-red-600 dark:text-red-400'
+                            : issue.severity === 'medium'
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-blue-600 dark:text-blue-400'
+                        }`}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          Line {issue.line}: {issue.message}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                          Severity: {issue.severity}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center justify-center p-8 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-700 dark:text-green-400"
+                >
+                  <CheckCircle className="w-6 h-6 mr-2" />
+                  <span>No security issues identified!</span>
                 </motion.div>
-              ))}
+              )}
             </div>
           </motion.div>
         )}
