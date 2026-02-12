@@ -26,6 +26,10 @@ app.get('/', (req, res) => {
 app.use('/api/phishing', phishingRouter);
 app.use('/api/code-review', codeReviewRouter);
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+  });
+}
+
+export default app;

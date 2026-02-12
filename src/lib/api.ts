@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function analyzeEmail(emailContent: string) {
   const response = await fetch(`${API_BASE_URL}/phishing/analyze`, {
@@ -8,11 +8,11 @@ export async function analyzeEmail(emailContent: string) {
     },
     body: JSON.stringify({ emailContent }),
   });
-  
+
   if (!response.ok) {
     throw new Error('Failed to analyze email');
   }
-  
+
   return response.json();
 }
 
@@ -24,10 +24,10 @@ export async function analyzeCode(code: string, language: string) {
     },
     body: JSON.stringify({ code, language }),
   });
-  
+
   if (!response.ok) {
     throw new Error('Failed to analyze code');
   }
-  
+
   return response.json();
 }

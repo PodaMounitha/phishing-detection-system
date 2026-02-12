@@ -2,6 +2,10 @@ import natural from 'natural';
 import fs from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse/sync';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const tokenizer = new natural.WordTokenizer();
 const classifier = new natural.BayesClassifier();
@@ -63,7 +67,7 @@ legitimateExamples.forEach(example => classifier.addDocument(example, 'legitimat
 
 // Load additional training data from SpamAssasin.csv if available
 try {
-  const csvPath = path.resolve('server/SpamAssasin.csv');
+  const csvPath = path.resolve(__dirname, '../SpamAssasin.csv');
   if (fs.existsSync(csvPath)) {
     const fileContent = fs.readFileSync(csvPath, 'utf-8');
     const records = parse(fileContent, {
