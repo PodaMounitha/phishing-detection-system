@@ -1,4 +1,7 @@
 import natural from 'natural';
+import fs from 'fs';
+import path from 'path';
+import { parse } from 'csv-parse/sync';
 
 const tokenizer = new natural.WordTokenizer();
 const classifier = new natural.BayesClassifier();
@@ -54,9 +57,33 @@ const legitimateExamples = [
   'holiday office hours notification',
 ];
 
-// Train the classifier
+// Add manual training data
 phishingExamples.forEach(example => classifier.addDocument(example, 'phishing'));
 legitimateExamples.forEach(example => classifier.addDocument(example, 'legitimate'));
+
+// Load additional training data from SpamAssasin.csv if available
+try {
+  const csvPath = path.resolve('server/SpamAssasin.csv');
+  if (fs.existsSync(csvPath)) {
+    const fileContent = fs.readFileSync(csvPath, 'utf-8');
+    const records = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      relax_column_count: true
+    });
+
+    const spamRecords = records.filter(r => r.Label === '1' && r.Body && r.Body !== 'empty').slice(0, 1000);
+    const hamRecords = records.filter(r => r.Label === '0' && r.Body && r.Body !== 'empty').slice(0, 1000);
+
+    spamRecords.forEach(r => classifier.addDocument(r.Body, 'phishing'));
+    hamRecords.forEach(r => classifier.addDocument(r.Body, 'legitimate'));
+
+    console.log(`Trained classifier with ${spamRecords.length} spam and ${hamRecords.length} ham examples from SpamAssasin.csv`);
+  }
+} catch (error) {
+  console.error('Error loading training dataset:', error);
+}
+
 classifier.train();
 
 // Comprehensive phishing indicators
@@ -93,69 +120,50 @@ function extractUrls(text) {
 // Check if URL looks suspicious
 function analyzeUrl(url) {
   const suspiciousIndicators = [];
-
   try {
     const urlObj = new URL(url);
-
-    // Check for IP address instead of domain
     if (/^\d+\.\d+\.\d+\.\d+$/.test(urlObj.hostname)) {
       suspiciousIndicators.push('IP address instead of domain name');
     }
-
-    // Check for suspicious TLDs
     const suspiciousTlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top'];
     if (suspiciousTlds.some(tld => urlObj.hostname.endsWith(tld))) {
       suspiciousIndicators.push('Suspicious top-level domain');
     }
-
-    // Check for excessive subdomains
     const subdomains = urlObj.hostname.split('.');
     if (subdomains.length > 4) {
       suspiciousIndicators.push('Excessive subdomains');
     }
-
-    // Check for URL shorteners
     const shorteners = ['bit.ly', 'tinyurl.com', 'goo.gl', 't.co', 'ow.ly'];
     if (shorteners.some(shortener => urlObj.hostname.includes(shortener))) {
       suspiciousIndicators.push('URL shortener detected');
     }
-
-    // Check for misleading characters
     if (urlObj.hostname.includes('@') || urlObj.hostname.includes('-')) {
       suspiciousIndicators.push('Potentially misleading characters in URL');
     }
-
   } catch (error) {
     suspiciousIndicators.push('Malformed URL');
   }
-
   return suspiciousIndicators;
 }
 
 // Scan URL with VirusTotal
 async function scanUrlWithVirusTotal(url) {
   if (!VIRUSTOTAL_API_KEY) {
-    return null; // Skip if no API key
+    return null;
   }
-
   try {
-    // Encode URL for VirusTotal
     const urlId = Buffer.from(url).toString('base64').replace(/=/g, '');
-
     const response = await fetch(`${VIRUSTOTAL_API_URL}/${urlId}`, {
       method: 'GET',
       headers: {
         'x-apikey': VIRUSTOTAL_API_KEY,
       },
     });
-
     if (!response.ok) {
       return null;
     }
-
     const data = await response.json();
     const stats = data.data?.attributes?.last_analysis_stats || {};
-
     return {
       malicious: stats.malicious || 0,
       suspicious: stats.suspicious || 0,
@@ -183,17 +191,20 @@ export async function analyzeEmail(emailContent) {
   }
 
   const lowerContent = normalized.toLowerCase();
-  const tokens = tokenizer.tokenize(lowerContent);
 
   // 1. Bayes Classifier Analysis
-  const classification = classifier.classify(normalized);
   const classifications = classifier.getClassifications(normalized);
-  const classifierScore = classifications.find(c => c.label === 'phishing')?.value || 0;
+
+  let classifierScore = 0;
+  if (classifications.length > 0) {
+    const total = classifications.reduce((acc, c) => acc + c.value, 0);
+    const phishing = classifications.find(c => c.label === 'phishing')?.value || 0;
+    classifierScore = total > 0 ? phishing / total : 0;
+  }
 
   // 2. Keyword Indicator Analysis
   const foundIndicators = [];
   let indicatorScore = 0;
-
   Object.entries(PHISHING_INDICATORS).forEach(([category, keywords]) => {
     keywords.forEach(keyword => {
       if (lowerContent.includes(keyword)) {
@@ -215,7 +226,6 @@ export async function analyzeEmail(emailContent) {
   const urls = extractUrls(normalized);
   let urlScore = 0;
   const urlAnalysis = [];
-
   for (const url of urls) {
     const urlIndicators = analyzeUrl(url);
     if (urlIndicators.length > 0) {
@@ -224,10 +234,9 @@ export async function analyzeEmail(emailContent) {
     }
   }
 
-  // 5. VirusTotal Analysis (for first URL if available)
+  // 5. VirusTotal Analysis
   let virusTotalResults = null;
   let vtScore = 0;
-
   if (urls.length > 0 && VIRUSTOTAL_API_KEY) {
     virusTotalResults = await scanUrlWithVirusTotal(urls[0]);
     if (virusTotalResults) {
@@ -237,23 +246,20 @@ export async function analyzeEmail(emailContent) {
   }
 
   // Calculate overall confidence score
-  // Normalize each component
-  const normalizedClassifier = classifierScore; // Already 0-1
-  const normalizedIndicators = Math.min(indicatorScore / 8, 1); // Cap at 8 indicators (more sensitive)
-  const normalizedPatterns = Math.min(patternScore / 4, 1); // Cap at 4 patterns (more sensitive)
-  const normalizedUrls = Math.min(urlScore / 4, 1); // Cap at 4 URL issues (more sensitive)
-  const normalizedVT = vtScore; // Already 0-1
+  const normalizedClassifier = classifierScore;
+  const normalizedIndicators = Math.min(indicatorScore / 8, 1);
+  const normalizedPatterns = Math.min(patternScore / 4, 1);
+  const normalizedUrls = Math.min(urlScore / 4, 1);
+  const normalizedVT = vtScore;
 
-  // Adjusted weights - reduce classifier impact, increase URL and pattern weights
   const weights = {
-    classifier: 0.15,      // Reduced from 0.25 - less reliable
-    indicators: 0.30,      // Increased from 0.25 - very reliable
-    patterns: 0.25,        // Increased from 0.20 - very reliable
-    urls: 0.20,            // Increased from 0.15 - highly suspicious
-    virusTotal: VIRUSTOTAL_API_KEY ? 0.10 : 0,  // Reduced from 0.15
+    classifier: 0.25,
+    indicators: 0.25,
+    patterns: 0.20,
+    urls: 0.20,
+    virusTotal: VIRUSTOTAL_API_KEY ? 0.10 : 0,
   };
 
-  // Redistribute VirusTotal weight if no API key
   if (!VIRUSTOTAL_API_KEY) {
     weights.indicators += 0.04;
     weights.patterns += 0.03;
@@ -268,7 +274,6 @@ export async function analyzeEmail(emailContent) {
     normalizedVT * weights.virusTotal
   ) * 100;
 
-  // Boost confidence if multiple methods agree (3 or more methods show >40%)
   const highScoreMethods = [
     normalizedClassifier > 0.4,
     normalizedIndicators > 0.4,
@@ -278,17 +283,13 @@ export async function analyzeEmail(emailContent) {
   ].filter(Boolean).length;
 
   if (highScoreMethods >= 3) {
-    confidenceRaw *= 1.15; // 15% boost when multiple methods agree
+    confidenceRaw *= 1.15;
   }
-
-  // If URLs are highly suspicious (>60%) and we have other indicators, boost confidence
   if (normalizedUrls > 0.6 && (normalizedIndicators > 0.3 || normalizedPatterns > 0.3)) {
-    confidenceRaw *= 1.1; // 10% boost for suspicious URLs with supporting evidence
+    confidenceRaw *= 1.1;
   }
 
   const confidence = Math.min(Math.max(confidenceRaw, 0), 100);
-
-  // Determine if phishing based on threshold - lowered from 40% to 35%
   const isPhishing = confidence > 35;
 
   return {

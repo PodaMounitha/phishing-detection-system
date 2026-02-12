@@ -33,7 +33,8 @@ The phishing detection works without VirusTotal, but adding it provides URL scan
 The phishing detection uses multiple methods:
 
 1. **Bayes Classifier** (25% weight)
-   - Trained on 40 examples of phishing and legitimate emails
+   - Trained on 2000+ examples from the SpamAssassin dataset
+   - Dynamically loads `server/SpamAssasin.csv` on startup
    - Uses natural language processing to classify content
 
 2. **Keyword Indicators** (25% weight)
@@ -67,8 +68,8 @@ The phishing detection uses multiple methods:
 
 ### Detection Threshold
 
-- **Confidence > 40%** = Flagged as potential phishing
-- **Confidence ≤ 40%** = Appears safe
+- **Confidence > 35%** = Flagged as potential phishing
+- **Confidence ≤ 35%** = Appears safe
 
 ### Testing Examples
 

@@ -58,21 +58,26 @@ export function PhishingDetection() {
   const [emailContent, setEmailContent] = useState('');
   const [result, setResult] = useState<null | AnalysisResult>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!emailContent.trim()) {
       setResult(null);
+      setError(null);
       return;
     }
 
     setIsLoading(true);
+    setError(null);
     try {
       const analysisResult = await analyzeEmail(emailContent);
       setResult(analysisResult);
-    } catch (error) {
-      console.error('Analysis failed:', error);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setError('Failed to connect to the analysis server. Please ensure the backend is running.');
+      setResult(null);
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +124,18 @@ export function PhishingDetection() {
                 />
               </motion.div>
             </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm flex items-center"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+                {error}
+              </motion.div>
+            )}
 
             <div className="flex justify-end">
               <motion.button

@@ -1,25 +1,33 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle, Upload } from 'lucide-react';
+import { AlertTriangle, Upload } from 'lucide-react';
+import { analyzeCode } from '../lib/api';
 
 export function CodeReview() {
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('javascript');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<null | {
     issues: Array<{ severity: 'high' | 'medium' | 'low'; message: string; line: number }>;
   }>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Integrate with backend API
-    // Mockup response for now
-    setResult({
-      issues: [
-        { severity: 'high', message: 'Potential SQL injection vulnerability', line: 12 },
-        { severity: 'medium', message: 'Insecure password hashing', line: 25 },
-        { severity: 'low', message: 'Missing input validation', line: 8 },
-      ],
-    });
+    if (!code.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await analyzeCode(code, language);
+      setResult(response);
+    } catch (err) {
+      console.error('Code analysis failed:', err);
+      setError('Failed to connect to the analysis server. Please ensure the backend is running.');
+      setResult(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -72,15 +80,29 @@ export function CodeReview() {
               />
             </div>
 
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm flex items-center"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+                {error}
+              </motion.div>
+            )}
+
             <div className="flex justify-end">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isLoading}
+                className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                  isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                }`}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Analyze Code
+                {isLoading ? 'Analyzing...' : 'Analyze Code'}
               </motion.button>
             </div>
           </form>
